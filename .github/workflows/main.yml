@@ -67,3 +67,30 @@ jobs:
         if: always()
         run: |
           docker rm -f project3-ci-db
+
+  deploy:
+    needs: test
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get secrets from Vault
+        env:
+          VAULT_ADDR: http://127.0.0.1:8200
+          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
+        run: |
+          vault kv get -format=json kv/project3 | \
+            jq -r '.data.data | to_entries[] | .key + "=" + .value' > .env
+
+          chmod 600 .env
+
+      - name: Deploy application
+        run: |
+          docker compose down
+          docker compose up -d --build
+
+      - name: Verify containers
+        run: |
+          docker ps
