@@ -1,4 +1,5 @@
 import os
+import time
 from flask import Flask, jsonify
 from config import Config
 from app.db import engine
@@ -20,8 +21,19 @@ def create_app():
 
     app.config.from_object(Config)
 
-    # Ensure tables are created
-    metadata.create_all(bind=engine)
+    # Ensure database is ready and tables are created
+    for attempt in range(10):
+        try:
+            metadata.create_all(bind=engine)
+            print("Database connection successful.")
+            break
+        except Exception as e:
+            print(f"Database not ready (attempt {attempt + 1}/10): {e}")
+
+            if attempt == 9:
+                raise
+
+            time.sleep(3)
 
     from app.routes_auth import auth_bp
     from app.routes_courses import courses_bp
