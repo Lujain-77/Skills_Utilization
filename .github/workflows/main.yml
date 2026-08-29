@@ -20,7 +20,7 @@ jobs:
       POSTGRES_DB: course_recommendation_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ci_password
-      DATABASE_URL: postgresql://postgres:ci_password@localhost:5432/course_recommendation_db
+      DATABASE_URL: postgresql://postgres:ci_password@localhost:5433/course_recommendation_db
       SECRET_KEY: ci-secret-key
       JWT_SECRET_KEY: ci-jwt-secret-key
 
@@ -37,7 +37,7 @@ jobs:
             -e POSTGRES_DB="$POSTGRES_DB" \
             -e POSTGRES_USER="$POSTGRES_USER" \
             -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
-            -p 5432:5432 \
+            -p 5433:5432 \
             postgres:16
 
       - name: Wait for PostgreSQL
