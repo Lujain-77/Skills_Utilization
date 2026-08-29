@@ -116,12 +116,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Hadolint
-        continue-on-error: true
-        uses: hadolint/hadolint-action@v3.4.0
-        with:
-          dockerfile: backend/Dockerfile
-          output-file: hadolint-report.txt
-          no-color: true
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/repo" \
+            hadolint/hadolint:latest \
+            hadolint /repo/backend/Dockerfile \
+            > hadolint-report.txt 2>&1 || true
+
+          echo "Hadolint scan completed."
 
       - name: Upload Hadolint report
         if: always()
