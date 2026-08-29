@@ -1,0 +1,105 @@
+name: Security Scans
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+
+  trufflehog:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/repo" \
+            -w /repo \
+            trufflesecurity/trufflehog:latest \
+            filesystem /repo \
+            --json \
+            > trufflehog-report.json 2>&1 || true
+
+          echo "TruffleHog scan completed."
+
+      - name: Upload TruffleHog report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trufflehog-report
+          path: trufflehog-report.json
+          if-no-files-found: warn
+
+
+  hadolint:
+    needs: trufflehog
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Hadolint
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/repo" \
+            hadolint/hadolint:latest \
+            hadolint /repo/backend/Dockerfile \
+            > hadolint-report.txt 2>&1 || true
+
+          echo "Hadolint scan completed."
+
+      - name: Upload Hadolint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hadolint-report
+          path: hadolint-report.txt
+          if-no-files-found: warn
+
+
+  bandit:
+    needs: hadolint
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Bandit
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit
+
+      - name: Run Bandit
+        run: |
+          bandit -r backend \
+            -f txt \
+            -o bandit-report.txt || true
+
+          echo "Bandit scan completed."
+
+      - name: Upload Bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.txt
+          if-no-files-found: warn
