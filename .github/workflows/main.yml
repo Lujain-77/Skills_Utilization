@@ -66,22 +66,23 @@ jobs:
       - name: Cleanup PostgreSQL
         if: always()
         run: |
-          docker rm -f project3-ci-db
+          docker rm -f project3-ci-db 2>/dev/null || true
 
   deploy:
     needs: test
     runs-on: self-hosted
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Check deployment directory
         run: |
-          echo "Current directory:"
+          cd /home/aau/Desktop/project3/Skills_Utilization
+
+          echo "Deployment directory:"
           pwd
-          echo "Repository contents:"
+
+          echo "Project contents:"
           ls -la
+
           echo "Docker Compose file:"
           ls -l docker-compose.yml
 
@@ -90,28 +91,35 @@ jobs:
           VAULT_ADDR: http://127.0.0.1:8200
           VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
         run: |
-          vault kv get -format=json kv/project3 | \
-            jq -r '.data.data | to_entries[] | .key + "=" + .value' > "$GITHUB_WORKSPACE/.env"
+          cd /home/aau/Desktop/project3/Skills_Utilization
 
-          chmod 600 "$GITHUB_WORKSPACE/.env"
+          vault kv get -format=json kv/project3 | \
+            jq -r '.data.data | to_entries[] | .key + "=" + .value' > .env
+
+          chmod 600 .env
 
           echo "Vault secrets retrieved successfully."
-          echo ".env file created at:"
-          echo "$GITHUB_WORKSPACE/.env"
+          echo ".env file created."
 
       - name: Verify environment file
         run: |
-          echo ".env exists:"
-          test -f "$GITHUB_WORKSPACE/.env"
+          cd /home/aau/Desktop/project3/Skills_Utilization
+
+          test -f .env
+
           echo ".env variables:"
-          cut -d '=' -f 1 "$GITHUB_WORKSPACE/.env"
+          cut -d '=' -f 1 .env
 
       - name: Deploy application
-        working-directory: ${{ github.workspace }}
         run: |
-          docker compose --env-file "$GITHUB_WORKSPACE/.env" down
-          docker compose --env-file "$GITHUB_WORKSPACE/.env" up -d --build
+          cd /home/aau/Desktop/project3/Skills_Utilization
+
+          docker compose --env-file .env down
+
+          docker compose --env-file .env up -d --build
 
       - name: Verify containers
         run: |
+          cd /home/aau/Desktop/project3/Skills_Utilization
+
           docker ps
