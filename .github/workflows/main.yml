@@ -1,4 +1,4 @@
-name: Skills Utilization CI
+name: Skills Utilization CI/CD
 
 on:
   push:
@@ -8,6 +8,10 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   test:
     runs-on: self-hosted
@@ -16,7 +20,7 @@ jobs:
       POSTGRES_DB: course_recommendation_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ci_password
-      DATABASE_URL: postgresql://postgres:ci_password@localhost:5433/course_recommendation_db
+      DATABASE_URL: postgresql://postgres:ci_password@localhost:5432/course_recommendation_db
       SECRET_KEY: ci-secret-key
       JWT_SECRET_KEY: ci-jwt-secret-key
 
@@ -33,7 +37,7 @@ jobs:
             -e POSTGRES_DB="$POSTGRES_DB" \
             -e POSTGRES_USER="$POSTGRES_USER" \
             -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
-            -p 5433:5432 \
+            -p 5432:5432 \
             postgres:16
 
       - name: Wait for PostgreSQL
@@ -68,8 +72,34 @@ jobs:
         run: |
           docker rm -f project3-ci-db 2>/dev/null || true
 
-  deploy:
+  build-and-push:
     needs: test
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build backend image
+        run: |
+          docker build \
+            -f backend/Dockerfile \
+            -t ghcr.io/lujain-77/skills_utilization:latest \
+            .
+
+      - name: Push backend image to GHCR
+        run: |
+          docker push ghcr.io/lujain-77/skills_utilization:latest
+
+  deploy:
+    needs: build-and-push
     runs-on: self-hosted
 
     steps:
@@ -100,25 +130,22 @@ jobs:
 
           echo "Vault secrets retrieved successfully."
 
-      - name: Verify environment file
+      - name: Pull GHCR backend image
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd /home/aau/Desktop/project3/Skills_Utilization
+          echo "$GHCR_TOKEN" | docker login ghcr.io \
+            -u "${{ github.actor }}" \
+            --password-stdin
 
-          echo ".env exists:"
-          test -f .env
-
-          echo ".env variables:"
-          cut -d '=' -f 1 .env
+          docker pull ghcr.io/lujain-77/skills_utilization:latest
 
       - name: Deploy application
+        working-directory: /home/aau/Desktop/project3/Skills_Utilization
         run: |
-          cd /home/aau/Desktop/project3/Skills_Utilization
-
           docker compose --env-file .env down
-          docker compose --env-file .env up -d --build
+          docker compose --env-file .env up -d
 
       - name: Verify containers
         run: |
-          cd /home/aau/Desktop/project3/Skills_Utilization
-
           docker ps
