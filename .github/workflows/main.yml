@@ -86,10 +86,13 @@ jobs:
 
           chmod 600 .env
 
+          echo "Vault secrets retrieved successfully."
+          echo ".env file created."
+
       - name: Deploy application
         run: |
-          docker compose down
-          docker compose up -d --build
+          docker compose --env-file .env down
+          docker compose --env-file .env up -d --build
 
       - name: Verify containers
         run: |
