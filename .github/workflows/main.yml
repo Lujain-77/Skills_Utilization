@@ -76,23 +76,41 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Check deployment directory
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Repository contents:"
+          ls -la
+          echo "Docker Compose file:"
+          ls -l docker-compose.yml
+
       - name: Get secrets from Vault
         env:
           VAULT_ADDR: http://127.0.0.1:8200
           VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
         run: |
           vault kv get -format=json kv/project3 | \
-            jq -r '.data.data | to_entries[] | .key + "=" + .value' > .env
+            jq -r '.data.data | to_entries[] | .key + "=" + .value' > "$GITHUB_WORKSPACE/.env"
 
-          chmod 600 .env
+          chmod 600 "$GITHUB_WORKSPACE/.env"
 
           echo "Vault secrets retrieved successfully."
-          echo ".env file created."
+          echo ".env file created at:"
+          echo "$GITHUB_WORKSPACE/.env"
+
+      - name: Verify environment file
+        run: |
+          echo ".env exists:"
+          test -f "$GITHUB_WORKSPACE/.env"
+          echo ".env variables:"
+          cut -d '=' -f 1 "$GITHUB_WORKSPACE/.env"
 
       - name: Deploy application
+        working-directory: ${{ github.workspace }}
         run: |
-          docker compose --env-file .env down
-          docker compose --env-file .env up -d --build
+          docker compose --env-file "$GITHUB_WORKSPACE/.env" down
+          docker compose --env-file "$GITHUB_WORKSPACE/.env" up -d --build
 
       - name: Verify containers
         run: |
