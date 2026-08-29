@@ -12,9 +12,41 @@ jobs:
   test:
     runs-on: self-hosted
 
+    env:
+      POSTGRES_DB: course_recommendation_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ci_password
+      DATABASE_URL: postgresql://postgres:ci_password@localhost:5432/course_recommendation_db
+      SECRET_KEY: ci-secret-key
+      JWT_SECRET_KEY: ci-jwt-secret-key
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Start PostgreSQL
+        run: |
+          docker rm -f project3-ci-db 2>/dev/null || true
+
+          docker run -d \
+            --name project3-ci-db \
+            -e POSTGRES_DB="$POSTGRES_DB" \
+            -e POSTGRES_USER="$POSTGRES_USER" \
+            -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+            -p 5432:5432 \
+            postgres:16
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in {1..30}; do
+            if docker exec project3-ci-db pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"; then
+              echo "PostgreSQL is ready"
+              break
+            fi
+
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,3 +62,8 @@ jobs:
         run: |
           cd backend
           python -c "import app; print('Flask application imported successfully')"
+
+      - name: Cleanup PostgreSQL
+        if: always()
+        run: |
+          docker rm -f project3-ci-db
